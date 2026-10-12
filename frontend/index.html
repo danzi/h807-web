@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>H807</title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+<div id="app" class="wrap">
+  <header class="topbar">
+    <h1>{{ page === 'sms' ? 'SMS' : 'Settings' }}</h1>
+    <div class="topbar-right" v-if="page === 'sms'">
+      <div class="auto-box">
+        <input type="checkbox" v-model="autoOn" @change="toggleAuto" title="Auto-refresh">
+        <input type="number" v-model.number="autoSec" min="1" max="300" title="Seconds">
+        <span>s</span>
+      </div>
+      <button class="icon-btn" @click="loadSms(true)" title="Refresh">↻</button>
+    </div>
+    <div class="topbar-right" v-else>
+      <button class="icon-btn" @click="loadTime" title="Refresh">↻</button>
+    </div>
+  </header>
+
+  <div class="page" v-show="page === 'sms'">
+    <div class="tabs">
+      <button class="tab" :class="{active: smsTab==='inbox'}" @click="smsTab='inbox'; expandedId=null">Inbox</button>
+      <button class="tab" :class="{active: smsTab==='sent'}" @click="smsTab='sent'; expandedId=null">Sent</button>
+    </div>
+
+    <div class="compose" v-show="smsTab==='sent'" :class="{open: composeOpen}">
+      <div class="compose-head" @click="composeOpen = !composeOpen">
+        <span>✏️ New message</span>
+        <span>{{ composeOpen ? '▲' : '▼' }}</span>
+      </div>
+      <div class="compose-body">
+        <div class="note">Real send via radio (SIM required). Errors shown below.</div>
+        <input v-model="sendAddr" type="text" placeholder="Phone number">
+        <textarea v-model="sendBody" placeholder="Message"></textarea>
+        <div class="error" v-if="sendErr" style="display:block">{{ sendErr }}</div>
+        <button class="btn primary" :disabled="sending" @click="sendSms">
+          {{ sending ? 'Sending…' : 'Send' }}
+        </button>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <button class="btn" @click="toggleSelectAll">
+        {{ visibleSms.length && visibleSms.every(s => selected.includes(String(s.id))) ? 'Deselect all' : 'Select all' }}
+      </button>
+      <button class="btn danger" :disabled="!selected.length" @click="deleteSelected">
+        {{ selected.length ? 'Delete (' + selected.length + ')' : 'Delete' }}
+      </button>
+      <div class="filters" v-show="smsTab==='inbox'">
+        <button class="filter" :class="{active: filter==='all'}" @click="filter='all'">All</button>
+        <button class="filter" :class="{active: filter==='unread'}" @click="filter='unread'">Unread</button>
+        <button class="filter" :class="{active: filter==='read'}" @click="filter='read'">Read</button>
+      </div>
+    </div>
+
+    <input class="search" v-model="search" type="search" placeholder="Search…">
+    <div class="info">{{ info }}</div>
+    <div class="error" v-if="error" style="display:block">{{ error }}</div>
+
+    <div class="list" v-if="visibleSms.length">
+      <template v-if="showSections">
+        <template v-if="unreadList.length">
+          <div class="section-label">Unread · {{ unreadList.length }}</div>
+          <div v-for="s in unreadList" :key="'u-'+s.id">
+      <div class="msg" :class="{unread: s.read==0, selected: selected.includes(String(s.id)), expanded: expandedId===String(s.id), busy: busyIds.has(String(s.id))}"
+           @click="toggleExpand(String(s.id), $event)">
+        <div class="msg-top">
+          <input type="checkbox" class="sel" :checked="selected.includes(String(s.id))"
+                 @click.stop @change="onCheck(String(s.id), $event.target.checked)">
+          <div class="msg-main">
+            <div><span class="addr">{{ s.address }}</span><span class="badge" v-if="s.read==0">new</span></div>
+            <div class="meta">{{ fmtDate(s.date) }}</div>
+          </div>
+          <div class="msg-actions" @click.stop>
+            <button v-if="smsTab==='inbox' && s.read!=0" class="btn-unread" title="Mark unread" @click="markRead(s.id, 0)">📩</button>
+            <button class="btn-del" title="Delete" @click="delOne(s.id)">×</button>
+          </div>
+        </div>
+        <div class="preview">{{ (s.body||'').slice(0,72) }}{{ (s.body||'').length>72?'…':'' }}</div>
+        <div class="body-full">{{ s.body }}</div>
+      </div>
+          </div>
+        </template>
+        <template v-if="readList.length">
+          <div class="section-label">Read · {{ readList.length }}</div>
+          <div v-for="s in readList" :key="'r-'+s.id">
+      <div class="msg" :class="{unread: s.read==0, selected: selected.includes(String(s.id)), expanded: expandedId===String(s.id), busy: busyIds.has(String(s.id))}"
+           @click="toggleExpand(String(s.id), $event)">
+        <div class="msg-top">
+          <input type="checkbox" class="sel" :checked="selected.includes(String(s.id))"
+                 @click.stop @change="onCheck(String(s.id), $event.target.checked)">
+          <div class="msg-main">
+            <div><span class="addr">{{ s.address }}</span><span class="badge" v-if="s.read==0">new</span></div>
+            <div class="meta">{{ fmtDate(s.date) }}</div>
+          </div>
+          <div class="msg-actions" @click.stop>
+            <button v-if="smsTab==='inbox' && s.read!=0" class="btn-unread" title="Mark unread" @click="markRead(s.id, 0)">📩</button>
+            <button class="btn-del" title="Delete" @click="delOne(s.id)">×</button>
+          </div>
+        </div>
+        <div class="preview">{{ (s.body||'').slice(0,72) }}{{ (s.body||'').length>72?'…':'' }}</div>
+        <div class="body-full">{{ s.body }}</div>
+      </div>
+          </div>
+        </template>
+      </template>
+      <template v-else>
+        <div v-for="s in visibleSms" :key="s.id">
+      <div class="msg" :class="{unread: s.read==0, selected: selected.includes(String(s.id)), expanded: expandedId===String(s.id), busy: busyIds.has(String(s.id))}"
+           @click="toggleExpand(String(s.id), $event)">
+        <div class="msg-top">
+          <input type="checkbox" class="sel" :checked="selected.includes(String(s.id))"
+                 @click.stop @change="onCheck(String(s.id), $event.target.checked)">
+          <div class="msg-main">
+            <div><span class="addr">{{ s.address }}</span><span class="badge" v-if="s.read==0">new</span></div>
+            <div class="meta">{{ fmtDate(s.date) }}</div>
+          </div>
+          <div class="msg-actions" @click.stop>
+            <button v-if="smsTab==='inbox' && s.read!=0" class="btn-unread" title="Mark unread" @click="markRead(s.id, 0)">📩</button>
+            <button class="btn-del" title="Delete" @click="delOne(s.id)">×</button>
+          </div>
+        </div>
+        <div class="preview">{{ (s.body||'').slice(0,72) }}{{ (s.body||'').length>72?'…':'' }}</div>
+        <div class="body-full">{{ s.body }}</div>
+      </div>
+        </div>
+      </template>
+    </div>
+    <div class="empty" v-else>No messages</div>
+  </div>
+
+  <div class="page" v-show="page === 'settings'">
+    <div class="card">
+      <h2>Device time</h2>
+      <div class="time-now">{{ deviceDate }}</div>
+      <div class="time-meta">Timezone: {{ deviceTz || '—' }}</div>
+      <div class="ok" v-if="timeMsg">{{ timeMsg }}</div>
+      <div class="error" v-if="timeErr" style="display:block">{{ timeErr }}</div>
+      <div class="field">
+        <label>Set date & time (YYYY-MM-DD HH:MM:SS)</label>
+        <input v-model="timeInput" type="text" placeholder="2026-10-12 15:30:00">
+      </div>
+      <div class="field">
+        <label>Timezone</label>
+        <input v-model="tzInput" type="text" placeholder="Europe/Kyiv">
+      </div>
+      <div class="row">
+        <button class="btn primary" :disabled="timeBusy" @click="setTime">
+          {{ timeBusy ? 'Saving…' : 'Apply' }}
+        </button>
+        <button class="btn" :disabled="timeBusy" @click="syncFromBrowser">Sync from browser</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>About</h2>
+      <div class="time-meta">H807 · Vue 3 + Awilix · port 8001</div>
+    </div>
+  </div>
+
+  <nav class="nav">
+    <button :class="{active: page==='sms'}" @click="go('sms')">
+      <span class="ico">💬</span> SMS
+    </button>
+    <button :class="{active: page==='settings'}" @click="go('settings')">
+      <span class="ico">⚙️</span> Settings
+    </button>
+  </nav>
+</div>
+
+<script src="/vendor/vue.global.prod.js"></script>
+<script src="/js/app.bundle.js"></script>
+</body>
+</html>
