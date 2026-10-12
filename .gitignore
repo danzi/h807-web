@@ -1,0 +1,23 @@
+# dependencies
+node_modules/
+frontend/node_modules/
+
+# build output (regenerate with: cd frontend && npm run build)
+dist/
+
+# logs / env
+*.log
+.env
+.env.*
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
+
+# adb / local device dumps
+*.orig
+init.qcom.post_boot.sh*
