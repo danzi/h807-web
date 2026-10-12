@@ -64,11 +64,8 @@
     <div class="error" v-if="error" style="display:block">{{ error }}</div>
 
     <div class="list" v-if="visibleSms.length">
-      <template v-if="showSections">
-        <template v-if="unreadList.length">
-          <div class="section-label">Unread · {{ unreadList.length }}</div>
-          <div v-for="s in unreadList" :key="'u-'+s.id">
-      <div class="msg" :class="{unread: s.read==0, selected: selected.includes(String(s.id)), expanded: expandedId===String(s.id), busy: busyIds.has(String(s.id))}"
+      <div v-for="s in visibleSms" :key="s.id"
+           class="msg" :class="{unread: s.read==0, selected: selected.includes(String(s.id)), expanded: expandedId===String(s.id), busy: busyIds.has(String(s.id))}"
            @click="toggleExpand(String(s.id), $event)">
         <div class="msg-top">
           <input type="checkbox" class="sel" :checked="selected.includes(String(s.id))"
@@ -85,52 +82,6 @@
         <div class="preview">{{ (s.body||'').slice(0,72) }}{{ (s.body||'').length>72?'…':'' }}</div>
         <div class="body-full">{{ s.body }}</div>
       </div>
-          </div>
-        </template>
-        <template v-if="readList.length">
-          <div class="section-label">Read · {{ readList.length }}</div>
-          <div v-for="s in readList" :key="'r-'+s.id">
-      <div class="msg" :class="{unread: s.read==0, selected: selected.includes(String(s.id)), expanded: expandedId===String(s.id), busy: busyIds.has(String(s.id))}"
-           @click="toggleExpand(String(s.id), $event)">
-        <div class="msg-top">
-          <input type="checkbox" class="sel" :checked="selected.includes(String(s.id))"
-                 @click.stop @change="onCheck(String(s.id), $event.target.checked)">
-          <div class="msg-main">
-            <div><span class="addr">{{ s.address }}</span><span class="badge" v-if="s.read==0">new</span></div>
-            <div class="meta">{{ fmtDate(s.date) }}</div>
-          </div>
-          <div class="msg-actions" @click.stop>
-            <button v-if="smsTab==='inbox' && s.read!=0" class="btn-unread" title="Mark unread" @click="markRead(s.id, 0)">📩</button>
-            <button class="btn-del" title="Delete" @click="delOne(s.id)">×</button>
-          </div>
-        </div>
-        <div class="preview">{{ (s.body||'').slice(0,72) }}{{ (s.body||'').length>72?'…':'' }}</div>
-        <div class="body-full">{{ s.body }}</div>
-      </div>
-          </div>
-        </template>
-      </template>
-      <template v-else>
-        <div v-for="s in visibleSms" :key="s.id">
-      <div class="msg" :class="{unread: s.read==0, selected: selected.includes(String(s.id)), expanded: expandedId===String(s.id), busy: busyIds.has(String(s.id))}"
-           @click="toggleExpand(String(s.id), $event)">
-        <div class="msg-top">
-          <input type="checkbox" class="sel" :checked="selected.includes(String(s.id))"
-                 @click.stop @change="onCheck(String(s.id), $event.target.checked)">
-          <div class="msg-main">
-            <div><span class="addr">{{ s.address }}</span><span class="badge" v-if="s.read==0">new</span></div>
-            <div class="meta">{{ fmtDate(s.date) }}</div>
-          </div>
-          <div class="msg-actions" @click.stop>
-            <button v-if="smsTab==='inbox' && s.read!=0" class="btn-unread" title="Mark unread" @click="markRead(s.id, 0)">📩</button>
-            <button class="btn-del" title="Delete" @click="delOne(s.id)">×</button>
-          </div>
-        </div>
-        <div class="preview">{{ (s.body||'').slice(0,72) }}{{ (s.body||'').length>72?'…':'' }}</div>
-        <div class="body-full">{{ s.body }}</div>
-      </div>
-        </div>
-      </template>
     </div>
     <div class="empty" v-else>No messages</div>
   </div>

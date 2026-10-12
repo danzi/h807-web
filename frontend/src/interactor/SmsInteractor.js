@@ -49,10 +49,7 @@ export function createSmsInteractor({ smsRepo }) {
             (s.body || '').toLowerCase().includes(q)
         );
       }
-      out.sort((a, b) => {
-        if (tab === 'inbox' && a.read != b.read) return a.read - b.read;
-        return (b.date || 0) - (a.date || 0);
-      });
+      out.sort((a, b) => (b.date || 0) - (a.date || 0));
       return out;
     },
 

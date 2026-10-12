@@ -10,7 +10,6 @@ export function createSmsPageSetup({ Vue, smsInteractor, storage }) {
     const filter = ref('all');
     const search = ref('');
     const expandedId = ref(null);
-    const expandedStickyUnread = ref(false); // keep card in Unread while open
     const busyIds = ref(new Set());
     const selected = ref((storage.getJson('h807_sel', []) || []).map(String));
     const info = ref('Loading…');
@@ -37,18 +36,6 @@ export function createSmsPageSetup({ Vue, smsInteractor, storage }) {
       })
     );
 
-    const unreadList = computed(() => visibleSms.value.filter((s) => {
-      if (expandedStickyUnread.value && String(s.id) === expandedId.value) return true;
-      return s.read == 0;
-    }));
-    const readList = computed(() => visibleSms.value.filter((s) => {
-      if (expandedStickyUnread.value && String(s.id) === expandedId.value) return false;
-      return s.read != 0;
-    }));
-    // Sections always on in All (stable; no toggle on expand)
-    const showSections = computed(
-      () => smsTab.value === 'inbox' && filter.value === 'all'
-    );
 
     async function loadSms(manual) {
       if (manual) info.value = 'Refreshing…';
@@ -82,12 +69,10 @@ export function createSmsPageSetup({ Vue, smsInteractor, storage }) {
       if (busyIds.value.has(id)) return;
       if (expandedId.value === id) {
         expandedId.value = null;
-        expandedStickyUnread.value = false;
         return;
       }
       expandedId.value = id;
       const msg = allSms.value.find((s) => String(s.id) === id);
-      expandedStickyUnread.value = !!(msg && msg.read == 0);
       if (msg && msg.read == 0) {
         setBusy(id, true);
         try {
@@ -192,7 +177,7 @@ export function createSmsPageSetup({ Vue, smsInteractor, storage }) {
     return {
       allSms, smsTab, filter, search, expandedId, busyIds, selected,
       info, error, composeOpen, sendAddr, sendBody, sendErr, sending,
-      autoOn, autoSec, visibleSms, unreadList, readList, showSections,
+      autoOn, autoSec, visibleSms,
       loadSms, toggleExpand, onCheck, toggleSelectAll, markRead, delOne,
       deleteSelected, sendSms, toggleAuto, fmtDate,
       _smsInit() {
