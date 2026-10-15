@@ -1,4 +1,5 @@
-import { fmtDate } from '../utils/format.js';
+import { fmtDate, isBadDate } from '../utils/format.js';
+import { smsUnits } from '../utils/smsEncode.js';
 
 export function createSmsPageSetup({ Vue, smsInteractor, storage }) {
   const { ref, computed, watch } = Vue;
@@ -20,7 +21,7 @@ export function createSmsPageSetup({ Vue, smsInteractor, storage }) {
     const sendErr = ref('');
     const sending = ref(false);
     const autoOn = ref(storage.getStr('h807_auto', '0') === '1');
-    const autoSec = ref(parseInt(storage.getStr('h807_sec', '15'), 10) || 15);
+    const autoSec = ref(parseInt(storage.getStr('h807_sec', '30'), 10) || 30);
     let autoTimer = null;
 
     function saveSel() {
@@ -142,16 +143,22 @@ export function createSmsPageSetup({ Vue, smsInteractor, storage }) {
       await loadSms(true);
     }
 
+    const sendOk = ref('');
+    const sendHint = computed(() => smsUnits(sendBody.value));
+
     async function sendSms() {
       sendErr.value = '';
+      sendOk.value = '';
       sending.value = true;
       try {
         await ix.sendMessage(sendAddr.value.trim(), sendBody.value.trim());
         sendBody.value = '';
-        composeOpen.value = false;
+        sendOk.value = 'Sent';
+        smsTab.value = 'sent';
+        composeOpen.value = true;
         await loadSms(true);
       } catch (e) {
-        sendErr.value = (e.message || 'Send failed') + (e.detail ? ': ' + e.detail : '');
+        sendErr.value = e.message || 'Send failed';
       } finally {
         sending.value = false;
       }
@@ -176,10 +183,10 @@ export function createSmsPageSetup({ Vue, smsInteractor, storage }) {
 
     return {
       allSms, smsTab, filter, search, expandedId, busyIds, selected,
-      info, error, composeOpen, sendAddr, sendBody, sendErr, sending,
+      info, error, composeOpen, sendAddr, sendBody, sendErr, sendOk, sending, sendHint,
       autoOn, autoSec, visibleSms,
       loadSms, toggleExpand, onCheck, toggleSelectAll, markRead, delOne,
-      deleteSelected, sendSms, toggleAuto, fmtDate,
+      deleteSelected, sendSms, toggleAuto, fmtDate, isBadDate,
       _smsInit() {
         loadSms(true);
         if (autoOn.value) toggleAuto();

@@ -51,8 +51,10 @@ cpSync(resolve(fe, 'assets/vendor/vue.global.prod.js'), resolve(dist, 'vendor/vu
 cpSync(resolve(fe, 'index.html'), resolve(dist, 'index.html'));
 cpSync(resolve(root, 'backend/api.cgi'), resolve(dist, 'cgi-bin/api.cgi'));
 cpSync(resolve(root, 'backend/lib/common.sh'), resolve(dist, 'cgi-bin/lib/common.sh'));
+cpSync(resolve(root, 'backend/lib/logs.sh'), resolve(dist, 'cgi-bin/lib/logs.sh'));
 cpSync(resolve(root, 'backend/lib/sms.sh'), resolve(dist, 'cgi-bin/lib/sms.sh'));
 cpSync(resolve(root, 'backend/lib/time.sh'), resolve(dist, 'cgi-bin/lib/time.sh'));
+cpSync(resolve(root, 'backend/lib/net.sh'), resolve(dist, 'cgi-bin/lib/net.sh'));
 cpSync(resolve(root, 'init/start-sms-monitor.sh'), resolve(dist, 'start-sms-monitor.sh'));
 
 console.log('OK → dist/');

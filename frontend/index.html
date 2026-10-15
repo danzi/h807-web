@@ -9,7 +9,7 @@
 <body>
 <div id="app" class="wrap">
   <header class="topbar">
-    <h1>{{ page === 'sms' ? 'SMS' : 'Settings' }}</h1>
+    <h1>{{ page === 'sms' ? 'SMS' : page === 'logs' ? 'Logs' : page === 'ip' ? 'IP History' : 'Settings' }}</h1>
     <div class="topbar-right" v-if="page === 'sms'">
       <div class="auto-box">
         <input type="checkbox" v-model="autoOn" @change="toggleAuto" title="Auto-refresh">
@@ -18,10 +18,21 @@
       </div>
       <button class="icon-btn" @click="loadSms(true)" title="Refresh">↻</button>
     </div>
-    <div class="topbar-right" v-else>
+    <div class="topbar-right" v-else-if="page === 'settings'">
       <button class="icon-btn" @click="loadTime" title="Refresh">↻</button>
     </div>
+    <div class="topbar-right" v-else-if="page === 'logs'">
+      <button class="icon-btn" @click="loadSendLogs" title="Refresh">↻</button>
+    </div>
+    <div class="topbar-right" v-else-if="page === 'ip'">
+      <button class="icon-btn" @click="loadIpHistory" title="Refresh">↻</button>
+    </div>
   </header>
+  <div class="device-clock" @click="onClockClick" title="Tap to set date & time">
+    <span class="clock-label">Device</span>
+    <span class="clock-value">{{ deviceDate || '—' }}</span>
+  </div>
+
 
   <div class="page" v-show="page === 'sms'">
     <div class="tabs">
@@ -35,10 +46,12 @@
         <span>{{ composeOpen ? '▲' : '▼' }}</span>
       </div>
       <div class="compose-body">
-        <div class="note">Real send via radio (SIM required). Errors shown below.</div>
-        <input v-model="sendAddr" type="text" placeholder="Phone number">
-        <textarea v-model="sendBody" placeholder="Message"></textarea>
-        <div class="error" v-if="sendErr" style="display:block">{{ sendErr }}</div>
+        <div class="note">SIM must be READY. Cyrillic is sent as UCS-2.</div>
+        <input v-model="sendAddr" type="tel" placeholder="Phone number" autocomplete="tel">
+        <textarea v-model="sendBody" placeholder="Message" maxlength="670"></textarea>
+        <div class="sms-count" v-if="sendBody">{{ sendHint.chars }}/{{ sendHint.per }} · {{ sendHint.alphabet }}{{ sendHint.segs > 1 ? ' · ' + sendHint.segs + ' SMS' : '' }}</div>
+        <div class="error" v-if="sendErr">{{ sendErr }}</div>
+        <div class="ok" v-if="sendOk">{{ sendOk }}</div>
         <button class="btn primary" :disabled="sending" @click="sendSms">
           {{ sending ? 'Sending…' : 'Send' }}
         </button>
@@ -61,7 +74,7 @@
 
     <input class="search" v-model="search" type="search" placeholder="Search…">
     <div class="info">{{ info }}</div>
-    <div class="error" v-if="error" style="display:block">{{ error }}</div>
+    <div class="error" v-if="error">{{ error }}</div>
 
     <div class="list" v-if="visibleSms.length">
       <div v-for="s in visibleSms" :key="s.id"
@@ -72,7 +85,7 @@
                  @click.stop @change="onCheck(String(s.id), $event.target.checked)">
           <div class="msg-main">
             <div><span class="addr">{{ s.address }}</span><span class="badge" v-if="s.read==0">new</span></div>
-            <div class="meta">{{ fmtDate(s.date) }}</div>
+            <div class="meta" :class="{'bad-date': isBadDate(s.date)}">{{ fmtDate(s.date) }}</div>
           </div>
           <div class="msg-actions" @click.stop>
             <button v-if="smsTab==='inbox' && s.read!=0" class="btn-unread" title="Mark unread" @click="markRead(s.id, 0)">📩</button>
@@ -86,24 +99,88 @@
     <div class="empty" v-else>No messages</div>
   </div>
 
+
+  <div class="page" v-show="page === 'ip'">
+    <div class="card">
+      <h2>Current IP</h2>
+      <div class="time-now">{{ ipCurrent || '—' }}</div>
+      <div class="time-meta">WAN: {{ ipWan || '—' }}</div>
+      <div class="time-meta">
+        Mode: {{ ipModeLabel || '—' }} ({{ ipMode === '' ? '—' : ipMode }})
+        <span v-if="ipRadio"> · Radio: {{ ipRadio }}</span>
+      </div>
+      <div class="note">Flips to the other mode (0↔1) without waiting, then returns to the current mode and checks IP. Public IP is from this phone; WAN is the modem 10.x address.</div>
+      <div class="ok ip-ok" v-if="ipOk">{{ ipOk }}</div>
+      <div class="error" v-if="ipErr">{{ ipErr }}</div>
+      <div class="row">
+        <button class="btn primary" :disabled="ipBusy" @click="changeIp">
+          {{ ipChanging ? 'Changing…' : 'Change IP' }}
+        </button>
+        <button class="btn" :disabled="ipBusy" @click="loadIpHistory">Refresh</button>
+      </div>
+    </div>
+    <div class="toolbar">
+      <button class="btn danger btn-sm" :disabled="ipBusy || !ipLogs.length" @click="clearIpHistory">Clear</button>
+    </div>
+    <div class="info">{{ ipInfo }}</div>
+    <div class="list" v-if="ipLogs.length">
+      <div v-for="(L, i) in ipLogs" :key="i" class="msg" style="cursor:default">
+        <div class="msg-top">
+          <div class="msg-main">
+            <div class="ip-pair">
+              <span class="pair-k">IP</span>
+              <span class="addr">{{ historyRow(L).ipFrom || '—' }} → {{ historyRow(L).ipTo || '—' }}</span>
+              <span class="badge" :class="'st-' + (L.status || 'unknown')">{{ L.status || '?' }}</span>
+            </div>
+            <div class="ip-pair">
+              <span class="pair-k">WAN</span>
+              <span>{{ historyRow(L).wanFrom || '—' }} → {{ historyRow(L).wanTo || '—' }}</span>
+            </div>
+            <div class="meta">{{ L.when || fmtDate(L.ts) }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="empty" v-else>{{ ipBusy ? 'Loading…' : 'No IP history' }}</div>
+  </div>
+
+  <div class="page" v-show="page === 'logs'">
+    <div class="tabs">
+      <button class="tab" :class="{active: logsTab==='send'}" @click="logsTab='send'; loadSendLogs()">SMS send</button>
+    </div>
+    <div class="toolbar">
+      <button class="btn danger btn-sm" :disabled="logsBusy || !sendLogs.length" @click="clearSendLogs">Clear</button>
+    </div>
+    <div class="info">{{ logsInfo }}</div>
+    <div class="error" v-if="logsErr">{{ logsErr }}</div>
+    <div class="list" v-if="sendLogs.length">
+      <div v-for="(L, i) in sendLogs" :key="i" class="msg" style="cursor:default">
+        <div class="msg-top">
+          <div class="msg-main">
+            <div>
+              <span class="addr">{{ L.address || '—' }}</span>
+              <span class="badge" :class="L.status==='ok' ? 'st-ok' : 'st-failed'">{{ L.status || '?' }}</span>
+            </div>
+            <div class="meta">{{ L.when || fmtDate(L.ts) }}</div>
+          </div>
+        </div>
+        <div class="preview" style="margin-left:0;white-space:pre-wrap">{{ L.body }}</div>
+        <div class="meta" style="margin-top:6px;word-break:break-all" v-if="L.detail">{{ L.detail }}</div>
+      </div>
+    </div>
+    <div class="empty" v-else>{{ logsBusy ? 'Loading…' : 'No send logs' }}</div>
+  </div>
+
   <div class="page" v-show="page === 'settings'">
     <div class="card">
       <h2>Device time</h2>
       <div class="time-now">{{ deviceDate }}</div>
       <div class="time-meta">Timezone: {{ deviceTz || '—' }}</div>
       <div class="ok" v-if="timeMsg">{{ timeMsg }}</div>
-      <div class="error" v-if="timeErr" style="display:block">{{ timeErr }}</div>
-      <div class="field">
-        <label>Set date & time (YYYY-MM-DD HH:MM:SS)</label>
-        <input v-model="timeInput" type="text" placeholder="2026-10-12 15:30:00">
-      </div>
-      <div class="field">
-        <label>Timezone</label>
-        <input v-model="tzInput" type="text" placeholder="Europe/Kyiv">
-      </div>
+      <div class="error" v-if="timeErr">{{ timeErr }}</div>
       <div class="row">
-        <button class="btn primary" :disabled="timeBusy" @click="setTime">
-          {{ timeBusy ? 'Saving…' : 'Apply' }}
+        <button class="btn primary" type="button" @click="openTimeModal">
+          Pick date & time
         </button>
         <button class="btn" :disabled="timeBusy" @click="syncFromBrowser">Sync from browser</button>
       </div>
@@ -114,9 +191,37 @@
     </div>
   </div>
 
+  <div class="modal-backdrop" v-show="timeModal" @click.self="closeTimeModal">
+    <div class="modal">
+      <h2>Set device time</h2>
+      <div class="note">This writes the clock on the router. Reboot keeps it only if RTC/NITZ accept the value — 1970 is never saved.</div>
+      <div class="error" v-if="timeErr">{{ timeErr }}</div>
+      <div class="field">
+        <label>Date & time</label>
+        <input v-model="timePicker" type="datetime-local">
+      </div>
+      <div class="field">
+        <label>Timezone</label>
+        <input v-model="tzInput" type="text" placeholder="Europe/Vilnius">
+      </div>
+      <div class="row">
+        <button class="btn primary" :disabled="timeBusy" @click="applyPicker">
+          {{ timeBusy ? 'Saving…' : 'Apply' }}
+        </button>
+        <button class="btn" :disabled="timeBusy" @click="closeTimeModal">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <nav class="nav">
     <button :class="{active: page==='sms'}" @click="go('sms')">
       <span class="ico">💬</span> SMS
+    </button>
+    <button :class="{active: page==='ip'}" @click="go('ip')">
+      <span class="ico">🌐</span> IP
+    </button>
+    <button :class="{active: page==='logs'}" @click="go('logs')">
+      <span class="ico">📋</span> Logs
     </button>
     <button :class="{active: page==='settings'}" @click="go('settings')">
       <span class="ico">⚙️</span> Settings
@@ -125,6 +230,6 @@
 </div>
 
 <script src="/vendor/vue.global.prod.js"></script>
-<script src="/js/app.bundle.js"></script>
+<script src="/js/app.bundle.js?v=iphop2"></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-import { toDateTimeLocal, nowDateTimeLocal } from '../utils/format.js';
+import { toDateTimeLocal, nowDateTimeLocal, wallClockToUtc } from '../utils/format.js';
 
 export function createTimeInteractor({ timeRepo }) {
   return {
@@ -17,7 +17,7 @@ export function createTimeInteractor({ timeRepo }) {
       if (!datetime || !String(datetime).trim()) {
         throw new Error('Enter datetime: YYYY-MM-DD HH:MM:SS');
       }
-      const data = await timeRepo.set(String(datetime).trim(), tz ? String(tz).trim() : '');
+      const data = await timeRepo.set(wallClockToUtc(String(datetime).trim()), tz ? String(tz).trim() : '');
       if (data.reply !== 'ok') {
         const err = new Error(data.msg || 'time_set failed');
         err.detail = data.detail || '';
