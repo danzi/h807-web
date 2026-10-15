@@ -201,10 +201,22 @@ net_hop_mode() {
   net_mobile_on
 }
 
-# Other of 0 (4G/3G) / 1 (4G). Mode 2 (3G) flips to 1.
+# Random other HiMI mode (0=4G/3G, 1=4G, 2=3G). salt flips the coin on retry.
 _ip_other_mode() {
-  if [ "$1" = "1" ]; then
-    echo 0
+  local orig n salt bit
+  orig="$1"
+  n=$(date +%s 2>/dev/null)
+  n=$(echo "$n" | /system/bin/busybox tr -cd '0-9')
+  [ -z "$n" ] && n=0
+  salt=$(echo "$2" | /system/bin/busybox tr -cd '0-9')
+  [ -z "$salt" ] && salt=0
+  bit=$(( (n + salt) % 2 ))
+  if [ "$orig" = "0" ]; then
+    if [ "$bit" -eq 0 ]; then echo 1; else echo 2; fi
+  elif [ "$orig" = "1" ]; then
+    if [ "$bit" -eq 0 ]; then echo 0; else echo 2; fi
+  elif [ "$orig" = "2" ]; then
+    if [ "$bit" -eq 0 ]; then echo 0; else echo 1; fi
   else
     echo 1
   fi
@@ -345,19 +357,20 @@ ip_history() {
   echo '}'
 }
 
-# orig → other → orig (0→1→0 or 1→0→1). Wait for WAN only after return.
+# orig → random other → orig (incl. 3G / mode 2). Wait for WAN only after return.
 # Second pass only if WAN is still the same. Public IP is read in the browser.
 ip_change() {
   local orig other wan0 wan2 attempt himi lab radio
   orig=$(himi_mode)
   [ -z "$orig" ] && orig=1
-  other=$(_ip_other_mode "$orig")
   wan0=$(wan_iface_ip)
-  log_dbg "ip_change orig=$orig other=$other wan0=$wan0"
+  log_dbg "ip_change orig=$orig wan0=$wan0"
 
   attempt=1
   wan2="$wan0"
   while [ "$attempt" -le "$IP_MAX_ATTEMPTS" ]; do
+    other=$(_ip_other_mode "$orig" "$attempt")
+    log_dbg "ip_change try=$attempt other=$other"
     net_hop_out_and_back "$orig" "$other"
     wan2=$(wait_wan "$wan0")
     log_dbg "ip_change try=$attempt back=$orig wan=$wan2 radio=$(radio_type)"

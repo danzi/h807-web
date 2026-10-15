@@ -109,7 +109,7 @@
         Mode: {{ ipModeLabel || '—' }} ({{ ipMode === '' ? '—' : ipMode }})
         <span v-if="ipRadio"> · Radio: {{ ipRadio }}</span>
       </div>
-      <div class="note">Flips to the other mode (0↔1) without waiting, then returns to the current mode and checks IP. Public IP is from this phone; WAN is the modem 10.x address.</div>
+      <div class="note">Flips to a random other mode (0 / 1 / 2) without waiting, then returns to the current mode and checks IP. Public IP is from this phone; WAN is the modem 10.x address.</div>
       <div class="ok ip-ok" v-if="ipOk">{{ ipOk }}</div>
       <div class="error" v-if="ipErr">{{ ipErr }}</div>
       <div class="row">
@@ -230,6 +230,6 @@
 </div>
 
 <script src="/vendor/vue.global.prod.js"></script>
-<script src="/js/app.bundle.js?v=iphop2"></script>
+<script src="/js/app.bundle.js?v=iphop3"></script>
 </body>
 </html>

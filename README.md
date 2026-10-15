@@ -117,7 +117,7 @@ Send log: `/data/local/tmp/sms-cgi/logs/send.log` (Logs tab).
 
 HiMI netmode: **0** = 4G/3G, **1** = 4G, **2** = 3G.
 
-`ip_change` reads the current mode, flips to the other of `0`/`1` **without waiting for WAN**, then restores the original (`0→1→0` or `1→0→1`). WAN is checked **after return**. If WAN is unchanged, one retry.
+`ip_change` reads the current mode (`0` / `1` / `2`), flips to a **random other** mode **without waiting for WAN**, then restores the original (`0→1|2→0`, `1→0|2→1`, `2→0|1→2`). WAN is checked **after return**. If WAN is unchanged, one retry (another random other).
 
 Public IP is polled in the browser (ipify). WAN is the modem 10.x / CGNAT address. History stores both pairs.
 
